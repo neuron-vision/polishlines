@@ -46,7 +46,30 @@ def load_data(data_dir):
     
     return image_paths, labels
 
-def finetune_mobilenet(data_dir="processed/train", epochs=10, batch_size=32, lr=0.001):
+def get_model(arch_name, num_classes):
+    if arch_name == 'mobilenet_v3_small':
+        model = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.IMAGENET1K_V1)
+        model.classifier[3] = nn.Linear(model.classifier[3].in_features, num_classes)
+    elif arch_name == 'mobilenet_v3_large':
+        model = models.mobilenet_v3_large(weights=models.MobileNet_V3_Large_Weights.IMAGENET1K_V1)
+        model.classifier[3] = nn.Linear(model.classifier[3].in_features, num_classes)
+    elif arch_name == 'resnet18':
+        model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
+    elif arch_name == 'resnet34':
+        model = models.resnet34(weights=models.ResNet34_Weights.IMAGENET1K_V1)
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
+    elif arch_name == 'efficientnet_b0':
+        model = models.efficientnet_b0(weights=models.EfficientNet_B0_Weights.IMAGENET1K_V1)
+        model.classifier[1] = nn.Linear(model.classifier[1].in_features, num_classes)
+    elif arch_name == 'efficientnet_b1':
+        model = models.efficientnet_b1(weights=models.EfficientNet_B1_Weights.IMAGENET1K_V1)
+        model.classifier[1] = nn.Linear(model.classifier[1].in_features, num_classes)
+    else:
+        raise ValueError(f"Unknown architecture: {arch_name}")
+    return model
+
+def finetune_mobilenet(data_dir="processed/train", epochs=1, batch_size=32, lr=0.001, arch_name='mobilenet_v3_small'):
     device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
     print(f"Using device: {device}")
     
@@ -95,8 +118,7 @@ def finetune_mobilenet(data_dir="processed/train", epochs=10, batch_size=32, lr=
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     
-    model = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.IMAGENET1K_V1)
-    model.classifier[3] = nn.Linear(model.classifier[3].in_features, num_classes)
+    model = get_model(arch_name, num_classes)
     model = model.to(device)
     
     criterion = nn.CrossEntropyLoss()
@@ -164,8 +186,9 @@ def finetune_mobilenet(data_dir="processed/train", epochs=10, batch_size=32, lr=
             torch.save({
                 'model_state_dict': model.state_dict(),
                 'label_encoder': label_encoder,
-                'num_classes': num_classes
-            }, 'mobilenet_finetuned.pth')
+                'num_classes': num_classes,
+                'arch_name': arch_name
+            }, f'{arch_name}_finetuned.pth')
             print(f"Saved best model with val acc: {val_acc:.2f}%")
         print()
     
@@ -212,7 +235,7 @@ def finetune_mobilenet(data_dir="processed/train", epochs=10, batch_size=32, lr=
         'confusion_matrix': cm.tolist(),
         'training_history': training_history,
         'model_info': {
-            'model': 'mobilenet_v3_small',
+            'model': arch_name,
             'num_classes': num_classes,
             'classes': class_names.tolist(),
             'train_samples': len(train_paths),
@@ -220,7 +243,7 @@ def finetune_mobilenet(data_dir="processed/train", epochs=10, batch_size=32, lr=
         }
     }
     
-    with open('benchmark_results.json', 'w') as f:
+    with open(f'benchmark_results_{arch_name}.json', 'w') as f:
         json.dump(benchmark_results, f, indent=2)
     
     print("\n" + "="*60)
@@ -247,7 +270,11 @@ def finetune_mobilenet(data_dir="processed/train", epochs=10, batch_size=32, lr=
     print("-"*60)
     print(classification_report(all_labels, all_preds, target_names=class_names))
     
-    print(f"\nResults saved to: benchmark_results.json")
+    print(f"\nResults saved to: benchmark_results_{arch_name}.json")
+    
+    return benchmark_results
 
 if __name__ == "__main__":
-    finetune_mobilenet()
+    import sys
+    arch_name = sys.argv[1] if len(sys.argv) > 1 else 'mobilenet_v3_small'
+    finetune_mobilenet(arch_name=arch_name)

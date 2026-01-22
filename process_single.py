@@ -1,6 +1,7 @@
 import cv2
 import json
 import sys
+import numpy as np
 from pathlib import Path
 from common_utils import erase_outer_contour, crop_from_contour, DEFAULT_IMAGE_SIZE
 
@@ -29,15 +30,24 @@ def process_single(input_folder):
     
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    img_path = input_path / "0.png"
-    if not img_path.exists():
-        raise FileNotFoundError(f"Image not found: {img_path}")
+    img_path_0 = input_path / "0.png"
+    img_path_1 = input_path / "-1.png"
     
-    image = cv2.imread(str(img_path))
-    if image is None:
-        raise ValueError(f"Could not load image: {img_path}")
+    if not img_path_0.exists():
+        raise FileNotFoundError(f"Image not found: {img_path_0}")
+    if not img_path_1.exists():
+        raise FileNotFoundError(f"Image not found: {img_path_1}")
     
-    image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    image_0 = cv2.imread(str(img_path_0))
+    image_1 = cv2.imread(str(img_path_1))
+    
+    if image_0 is None:
+        raise ValueError(f"Could not load image: {img_path_0}")
+    if image_1 is None:
+        raise ValueError(f"Could not load image: {img_path_1}")
+    
+    image_gray_0 = cv2.cvtColor(image_0, cv2.COLOR_BGR2GRAY)
+    image_gray_1 = cv2.cvtColor(image_1, cv2.COLOR_BGR2GRAY)
     
     contour_path = input_path / "Contour.json"
     if not contour_path.exists():
@@ -47,12 +57,20 @@ def process_single(input_folder):
         contour_data = json.load(f)
         contour = contour_data["Contour Data"]["Contour"]
     
-    masked = erase_outer_contour(image_gray, contour)
-    cropped = crop_from_contour(masked, contour)
-    resized = cv2.resize(cropped, DEFAULT_IMAGE_SIZE)
+    masked_0 = erase_outer_contour(image_gray_0, contour)
+    masked_1 = erase_outer_contour(image_gray_1, contour)
+    
+    cropped_0 = crop_from_contour(masked_0, contour)
+    cropped_1 = crop_from_contour(masked_1, contour)
+    
+    resized_0 = cv2.resize(cropped_0, DEFAULT_IMAGE_SIZE)
+    resized_1 = cv2.resize(cropped_1, DEFAULT_IMAGE_SIZE)
+    
+    combined_2channel = np.stack([resized_0, resized_1], axis=2)
+    combined_3channel = np.concatenate([combined_2channel, np.zeros((*DEFAULT_IMAGE_SIZE, 1), dtype=np.uint8)], axis=2)
     
     output_img_path = output_dir / f"{folder_name}.png"
-    cv2.imwrite(str(output_img_path), resized)
+    cv2.imwrite(str(output_img_path), combined_3channel)
     
     flat_data = {}
     for json_file in input_path.glob("*.json"):
