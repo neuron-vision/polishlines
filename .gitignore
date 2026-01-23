@@ -1,5 +1,6 @@
 data/
 processed/
+viz/
 
 # Python
 __pycache__/
