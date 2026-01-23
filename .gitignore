@@ -51,3 +51,4 @@ htmlcov/
 # Environment variables
 .env
 .env.local
+preprocessed_mean_images/
