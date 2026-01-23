@@ -2,6 +2,7 @@ data/
 processed/
 viz/
 pipeline_outputs/
+preprocessed_scan_lines/
 
 # Python
 __pycache__/

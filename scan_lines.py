@@ -54,7 +54,19 @@ def scan_angle_full(image, angle, step=10, min_correlation=0.1):
     
     return all_correlations, result_map
 
-def nms_line_detections(detections, distance_threshold=10):
+def point_to_contour_distance(point, contour, image_shape):
+    pos_x, pos_y = point
+    h, w = image_shape
+    
+    if pos_x < 0 or pos_x >= w or pos_y < 0 or pos_y >= h:
+        return float('inf')
+    
+    contour_arr = np.array(contour, dtype=np.int32)
+    distances = cv2.pointPolygonTest(contour_arr, (pos_x, pos_y), True)
+    
+    return abs(distances)
+
+def nms_line_detections(detections, distance_threshold=10, contour=None, contour_distance_threshold=20, image_shape=None):
     if len(detections) == 0:
         return []
     
@@ -62,9 +74,15 @@ def nms_line_detections(detections, distance_threshold=10):
     kept = []
     
     for det in detections:
+        pos_x, pos_y = det['position']
+        
+        if contour is not None and image_shape is not None:
+            dist_to_contour = point_to_contour_distance((pos_x, pos_y), contour, image_shape)
+            if dist_to_contour < contour_distance_threshold:
+                continue
+        
         is_too_close = False
         for kept_det in kept:
-            pos_x, pos_y = det['position']
             kept_x, kept_y = kept_det['position']
             distance = np.sqrt((pos_x - kept_x)**2 + (pos_y - kept_y)**2)
             if distance < distance_threshold:
@@ -80,70 +98,45 @@ def scan_lines(input_folder, verbose=True):
     input_path = Path(input_folder)
     folder_name = input_path.name
     
-    img_path_0 = input_path / "0.png"
-    img_path_1 = input_path / "-1.png"
+    preprocessed_dir = Path("preprocessed_scan_lines")
+    preprocessed_image_path = preprocessed_dir / f"{folder_name}.png"
+    preprocessed_contour_path = preprocessed_dir / f"{folder_name}_contour.json"
+    preprocessed_extra_path = preprocessed_dir / f"{folder_name}_extra.json"
     
-    if not img_path_0.exists():
-        raise FileNotFoundError(f"Image not found: {img_path_0}")
-    if not img_path_1.exists():
-        raise FileNotFoundError(f"Image not found: {img_path_1}")
+    if not preprocessed_image_path.exists():
+        raise FileNotFoundError(f"Preprocessed image not found: {preprocessed_image_path}")
+    if not preprocessed_contour_path.exists():
+        raise FileNotFoundError(f"Preprocessed contour not found: {preprocessed_contour_path}")
     
-    image_0 = cv2.imread(str(img_path_0))
-    image_1 = cv2.imread(str(img_path_1))
+    cropped_image = cv2.imread(str(preprocessed_image_path), cv2.IMREAD_GRAYSCALE)
+    if cropped_image is None:
+        raise ValueError(f"Could not load preprocessed image: {preprocessed_image_path}")
     
-    if image_0 is None:
-        raise ValueError(f"Could not load image: {img_path_0}")
-    if image_1 is None:
-        raise ValueError(f"Could not load image: {img_path_1}")
-    
-    image_gray_0 = cv2.cvtColor(image_0, cv2.COLOR_BGR2GRAY)
-    image_gray_1 = cv2.cvtColor(image_1, cv2.COLOR_BGR2GRAY)
-    
-    merged_gray = ((image_gray_0.astype(np.float32) + image_gray_1.astype(np.float32)) / 2).astype(np.uint8)
-    
-    contour_path = input_path / "Contour.json"
-    if not contour_path.exists():
-        raise FileNotFoundError(f"Contour.json not found: {contour_path}")
-    
-    with open(contour_path, 'r') as f:
+    with open(preprocessed_contour_path, 'r') as f:
         contour_data = json.load(f)
         contour = contour_data["Contour Data"]["Contour"]
-    
-    masked = erase_outer_contour(merged_gray, contour)
-    
-    contour_arr = np.array(contour, dtype=np.int32)
-    x, y, w, h = cv2.boundingRect(contour_arr)
-    cropped_image = masked[y:y+h, x:x+w]
-    
-    orig_h, orig_w = cropped_image.shape[:2]
-    max_dim = max(orig_h, orig_w)
-    
-    if max_dim > 2048:
-        scale = 2048.0 / max_dim
-        new_w = int(orig_w * scale)
-        new_h = int(orig_h * scale)
-        cropped_image = cv2.resize(cropped_image, (new_w, new_h), interpolation=cv2.INTER_AREA)
     
     if len(cropped_image.shape) == 2:
         cropped_color = cv2.cvtColor(cropped_image, cv2.COLOR_GRAY2BGR)
     else:
         cropped_color = cropped_image.copy()
     
-    center_x_orig = int(np.mean(contour_arr[:, 0]))
-    center_y_orig = int(np.mean(contour_arr[:, 1]))
+    contour_arr = np.array(contour, dtype=np.int32)
+    center_x = int(np.mean(contour_arr[:, 0]))
+    center_y = int(np.mean(contour_arr[:, 1]))
     
-    scale_factor = cropped_image.shape[1] / orig_w if orig_w > 0 else 1.0
-    center_x = int((center_x_orig - x) * scale_factor)
-    center_y = int((center_y_orig - y) * scale_factor)
+    if preprocessed_extra_path.exists():
+        with open(preprocessed_extra_path, 'r') as f:
+            extra_data = json.load(f)
+    else:
+        extra_data_path = input_path / "Extra Data.json"
+        if not extra_data_path.exists():
+            raise FileNotFoundError(f"Extra Data.json not found: {extra_data_path}")
+        with open(extra_data_path, 'r') as f:
+            extra_data = json.load(f)
     
-    extra_data_path = input_path / "Extra Data.json"
-    if not extra_data_path.exists():
-        raise FileNotFoundError(f"Extra Data.json not found: {extra_data_path}")
-    
-    with open(extra_data_path, 'r') as f:
-        extra_data = json.load(f)
-        angles = extra_data.get("Polish Lines Data", {}).get("Chosen Facet PD", [])
-        label = extra_data.get("Polish Lines Data", {}).get("User Input", "Unknown")
+    angles = extra_data.get("Polish Lines Data", {}).get("Chosen Facet PD", [])
+    label = extra_data.get("Polish Lines Data", {}).get("User Input", "Unknown")
     
     if not angles:
         raise ValueError(f"No angles found in Chosen Facet PD for {folder_name}")
@@ -190,7 +183,13 @@ def scan_lines(input_folder, verbose=True):
     all_correlations_for_angle = selected_angle_data['correlations']
     
     all_correlations_for_angle.sort(key=lambda x: x['correlation'], reverse=True)
-    nms_lines = nms_line_detections(all_correlations_for_angle, distance_threshold=10)
+    nms_lines = nms_line_detections(
+        all_correlations_for_angle, 
+        distance_threshold=10,
+        contour=contour,
+        contour_distance_threshold=20,
+        image_shape=cropped_image.shape
+    )
     top_5_best_angle_lines = nms_lines[:5]
     
     if verbose:
