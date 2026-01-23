@@ -125,6 +125,55 @@
 - Radon Transform for line projections
 - Orientation histograms
 
+## Correlation-Based Polish Line Detection Variations
+
+### Current Approach (scan_lines.py)
+- Template matching with line kernels at specific angles
+- Voting mechanism to select best angle
+- NMS to select top 5 distinct lines
+- Pros: Direct correlation, works with known angles
+- Cons: Computationally expensive, requires angle candidates
+
+### Variation 1: Radon Transform Based Detection
+- Use Radon transform to project image at all angles
+- Find peaks in Radon space corresponding to parallel lines
+- Select angle with strongest peak pattern
+- Draw lines at detected positions
+- Pros: More robust to noise, detects all line orientations
+- Cons: Computationally intensive, requires peak detection
+
+### Variation 2: Hough Line Transform Based Detection
+- Apply Hough Line Transform to detect all lines
+- Group lines by angle (within tolerance)
+- Vote for most common angle
+- Select top 5 strongest lines at winning angle
+- Pros: Standard technique, well-tested
+- Cons: Parameter tuning required, may detect non-polish lines
+
+### Variation 3: Multi-Scale Correlation Scanning
+- Scan at multiple kernel sizes (20px, 30px, 40px, 50px)
+- Aggregate correlations across scales
+- Weight by scale (larger kernels for stronger lines)
+- Select angle with best multi-scale correlation
+- Pros: More robust to line thickness variations
+- Cons: 4x computation time, requires scale weighting
+
+### Variation 4: FFT-Based Frequency Domain Detection
+- Compute FFT for each angle's correlation map
+- Look for periodic patterns in frequency domain
+- Select angle with strongest periodic signature
+- Use inverse FFT to locate line positions
+- Pros: Excellent for periodic/regular polish lines
+- Cons: Assumes regular spacing, sensitive to noise
+
+### Variation 5: Edge-Enhanced Correlation Detection
+- Apply Canny/Sobel edge detection first
+- Use edge map for correlation instead of raw image
+- Line kernels match against edge patterns
+- Select angle with best edge correlation
+- Pros: Emphasizes line features, reduces background noise
+- Cons: May miss subtle lines, edge detection parameters critical
+
 ## Model Architecture Modifications
 
 ### Attention Mechanisms

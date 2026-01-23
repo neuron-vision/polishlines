@@ -43,8 +43,13 @@ def visualize_lines(input_folder):
         contour = contour_data["Contour Data"]["Contour"]
     
     contour_arr = np.array(contour, dtype=np.int32)
-    center_x = int(np.mean(contour_arr[:, 0]))
-    center_y = int(np.mean(contour_arr[:, 1]))
+    x, y, w, h = cv2.boundingRect(contour_arr)
+    cropped_image = merged_color[y:y+h, x:x+w]
+    
+    center_x_orig = int(np.mean(contour_arr[:, 0]))
+    center_y_orig = int(np.mean(contour_arr[:, 1]))
+    center_x = center_x_orig - x
+    center_y = center_y_orig - y
     
     extra_data_path = input_path / "Extra Data.json"
     if not extra_data_path.exists():
@@ -57,10 +62,24 @@ def visualize_lines(input_folder):
     if not angles:
         raise ValueError(f"No angles found in Chosen Facet PD for {folder_name}")
     
-    h, w = merged_color.shape[:2]
+    h, w = cropped_image.shape[:2]
     max_dist = int(np.sqrt(w**2 + h**2))
     
-    for angle in angles:
+    color_map = {
+        0: (255, 255, 255),
+        1: (0, 255, 0),
+        2: (0, 255, 255),
+        3: (0, 165, 255),
+        4: (0, 0, 255)
+    }
+    
+    legend_y = 60
+    legend_x_start = 20
+    
+    for idx, angle in enumerate(angles):
+        color_idx = idx % 5
+        color = color_map[color_idx]
+        
         angle_rad = np.deg2rad(angle + 90)
         
         dx = max_dist * np.cos(angle_rad)
@@ -71,13 +90,18 @@ def visualize_lines(input_folder):
         pt2_x = int(center_x + dx)
         pt2_y = int(center_y + dy)
         
-        cv2.line(merged_color, (pt1_x, pt1_y), (pt2_x, pt2_y), (0, 255, 0), 2)
+        cv2.line(cropped_image, (pt1_x, pt1_y), (pt2_x, pt2_y), color, 2)
+        
+        legend_text = f"Angle {idx}: {angle:.1f}°"
+        cv2.putText(cropped_image, legend_text, (legend_x_start, legend_y), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 2.4, color, 8)
+        legend_y += 100
     
     output_dir = Path("viz/angles")
     output_dir.mkdir(parents=True, exist_ok=True)
     
     output_path = output_dir / f"{folder_name}.png"
-    cv2.imwrite(str(output_path), merged_color)
+    cv2.imwrite(str(output_path), cropped_image)
     
     print(f"Visualized: {folder_name} - {len(angles)} angles")
 

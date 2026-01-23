@@ -1,6 +1,7 @@
 data/
 processed/
 viz/
+pipeline_outputs/
 
 # Python
 __pycache__/
