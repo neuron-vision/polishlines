@@ -54,3 +54,8 @@ htmlcov/
 .env
 .env.local
 preprocessed_mean_images/
+
+# Benchmark files
+benchmark_*.txt
+benchmark_*.json
+benchmark_scan_lines*.py
