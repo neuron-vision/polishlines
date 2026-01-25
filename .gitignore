@@ -60,3 +60,8 @@ preprocessed_mean_images/
 benchmark_*.txt
 benchmark_*.json
 benchmark_scan_lines*.py
+edge_fine_step_vis/
+benchmark_full_set.log
+benchmark_full_set_results.json
+full_benchmark_report.json
+visualize_all_edge_fine_step.sh
