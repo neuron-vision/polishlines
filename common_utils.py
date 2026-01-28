@@ -4,6 +4,11 @@ import json
 import matplotlib.pyplot as plt
 from pathlib import Path
 
+
+ROOT_FOLDER = Path(__file__).parent
+DATA_FOLDER = ROOT_FOLDER / "scan/PLScanDB/"
+PROCESSED_DATA_FOLDER = ROOT_FOLDER / "processed_data/"
+
 DEFAULT_IMAGE_SIZE = (512, 512)
 
 def crop_from_contour(image, contour):
@@ -66,79 +71,10 @@ if __name__ == "__main__":
         
         image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         
-        with open(contour_path, 'r') as f:
-            data = json.load(f)
-            contour = data["Contour Data"]["Contour"]
-        
-        masked = erase_outer_contour(image_gray, contour)
-        cropped = crop_from_contour(masked, contour)
-        resized = cv2.resize(cropped, DEFAULT_IMAGE_SIZE)
-        
-        fft_resized = np.fft.fft2(resized)
-        fft_shifted = np.fft.fftshift(fft_resized)
-        fft_magnitude = np.log(np.abs(fft_shifted) + 1)
-        
-        processed_images.append((resized, fft_magnitude, sample_dir.name, label))
+    with open(contour_path, 'r') as f:
+        data = json.load(f)
+        contour = data["Contour Data"]["Contour"]
     
-    for idx, (resized, fft_magnitude, folder_name, label) in enumerate(processed_images):
-        row = 0 if label == "Has_PL" else 1
-        col = idx if label == "Has_PL" else idx - 3
-        
-        axes[row, col * 2].imshow(resized, cmap='gray')
-        axes[row, col * 2].set_title(f"{folder_name} - {label}", fontsize=10, fontweight='bold')
-        axes[row, col * 2].axis('off')
-        
-        axes[row, col * 2 + 1].imshow(fft_magnitude, cmap='viridis')
-        axes[row, col * 2 + 1].set_title(f"FFT - {label}", fontsize=10)
-        axes[row, col * 2 + 1].axis('off')
-    
-    plt.tight_layout()
-    plt.show()
-    
-    fig2, axes2 = plt.subplots(2, 3, figsize=(18, 12))
-    fig2.suptitle("FFT Comparison: Top 3 No_PL | Bottom 3 Has_PL", fontsize=16, fontweight='bold')
-    
-    no_pl_ffts = []
-    has_pl_ffts = []
-    
-    for idx, (sample_dir, label) in enumerate(zip(all_samples, all_labels)):
-        img_path = sample_dir / "0.png"
-        contour_path = sample_dir / "Contour.json"
-        
-        if not img_path.exists() or not contour_path.exists():
-            continue
-        
-        image = cv2.imread(str(img_path))
-        if image is None:
-            continue
-        
-        image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        
-        with open(contour_path, 'r') as f:
-            data = json.load(f)
-            contour = data["Contour Data"]["Contour"]
-        
-        masked = erase_outer_contour(image_gray, contour)
-        cropped = crop_from_contour(masked, contour)
-        resized = cv2.resize(cropped, DEFAULT_IMAGE_SIZE)
-        
-        fft_resized = np.fft.fft2(resized)
-        fft_shifted = np.fft.fftshift(fft_resized)
-        fft_magnitude = np.log(np.abs(fft_shifted) + 1)
-        
-        if label == "No_PL":
-            no_pl_ffts.append(fft_magnitude)
-        else:
-            has_pl_ffts.append(fft_magnitude)
-    
-    for idx in range(3):
-        if idx < len(no_pl_ffts):
-            axes2[0, idx].imshow(no_pl_ffts[idx], cmap='viridis')
-            axes2[0, idx].axis('off')
-        
-        if idx < len(has_pl_ffts):
-            axes2[1, idx].imshow(has_pl_ffts[idx], cmap='viridis')
-            axes2[1, idx].axis('off')
-    
-    plt.tight_layout()
-    plt.show()
+    contour = np.array(contour, dtype=np.int32)
+    x, y, w, h = cv2.boundingRect(contour)
+    cropped = image[y:y+h, x:x+w]
