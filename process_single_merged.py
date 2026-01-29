@@ -25,12 +25,13 @@ add the offest contur to the data.json
 
 
 kernels_num_white_num_black = [
-    [1, 1],
     [3, 2],
     [3, 3],
     [5, 5],
     [7, 7],
     [9, 9],
+    [11, 11],
+    [13, 13],
 ]
 
 kernels = []
@@ -147,12 +148,11 @@ if __name__ == "__main__":
         highpassed_images = []
         for kernel in kernels:
             full_height_kernel = np.repeat([kernel], cropped_rotated_image.shape[0], axis=0).reshape(cropped_rotated_image.shape[0], -1).astype(np.float32)
-            full_height_kernel = full_height_kernel - full_height_kernel.mean()  # Zero the sum of the kernel
-
+            full_height_kernel = full_height_kernel / float(full_height_kernel.sum())
             cropped_rotated_image_mean = cropped_rotated_image.mean()
             highpassed = cv2.filter2D(cropped_rotated_image - cropped_rotated_image_mean, -1, full_height_kernel)
-            highpassed = highpassed * float_mask  # Zero energy outside the contour
-            power = (np.abs(highpassed ) / float_mask.mean()).mean()  # Square for energy and normalize by the mean energy inside the contour
+            highpassed = highpassed * float_mask
+            power = (highpassed * highpassed / float_mask.mean()).mean()
             mean_power += power
 
             highpassed += cropped_rotated_image_mean
