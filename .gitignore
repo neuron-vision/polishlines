@@ -68,3 +68,5 @@ visualize_all_edge_fine_step.sh
 pipeline_results.jsonlscan/
 processed_data/
 scan/
+*.pth
+highpass_results.json
