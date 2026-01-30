@@ -1,6 +1,6 @@
 highpass_clip_low_percentile: 5
 highpass_clip_high_percentile: 95
-should_plot_png: true
+should_plot_png: false
 
 kernels_num_white_num_black: [
     [1, 1],
@@ -11,5 +11,5 @@ kernels_num_white_num_black: [
 
 resized_height: 100
 should_resize_height: true
-
-fast_test_split_size: 100
+fast_test_split_size: 200
+speed_run: true

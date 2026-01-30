@@ -5,14 +5,10 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-from common_utils import erase_outer_contour, crop_from_contour, DEFAULT_IMAGE_SIZE, load_meta_params
+from common_utils import load_meta_params
 from common_utils import ROOT_FOLDER, DATA_FOLDER, PROCESSED_DATA_FOLDER
-import sys
 
 meta_params = load_meta_params()
-PLOT_PNG = meta_params['should_plot_png']
-
-kernels_num_white_num_black = meta_params['kernels_num_white_num_black']
 
 f'''
 For given folder,
@@ -28,12 +24,6 @@ data.json is the Extra Data.json with the label field added and the image_path f
 add the offest contur to the data.json
 
 '''
-
-
-kernels = []
-for num_white, num_black in kernels_num_white_num_black:
-    kernel = [1] * num_white + [-1] * num_black + [1] * num_white
-    kernels.append(kernel)
 
 
 def flatten_dict(d, parent_key='', sep='_'):
@@ -97,8 +87,9 @@ if __name__ == "__main__":
     output_dir = PROCESSED_DATA_FOLDER / data['label'] / folder_name
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    cv2.imwrite(str(output_dir / "mask.png"), mask)
-    cv2.imwrite(str(output_dir / f"masked_image_{label}.png"), masked)
+    if meta_params['should_plot_png']:
+        cv2.imwrite(str(output_dir / "mask.png"), mask)
+        cv2.imwrite(str(output_dir / f"masked_image_{label}.png"), masked)
 
     data['image_path'] = str(output_dir / f"masked_image_{label}.png")
     data['mask_path'] = str(output_dir / "mask.png")
@@ -124,15 +115,29 @@ if __name__ == "__main__":
         mask_output_path = output_dir / f"rotated_mask_{int(angle)}.png"
         #cv2.imwrite(str(mask_output_path), mask)
 
+        if meta_params['should_resize_height']:
+            cropped_rotated_image = cv2.resize(cropped_rotated_image, (cropped_rotated_image.shape[1], meta_params['resized_height']))
+            mask = cv2.resize(mask, (cropped_rotated_image.shape[1], meta_params['resized_height']))
+
         cropped_rotated_image = cv2.bitwise_and(cropped_rotated_image, cropped_rotated_image, mask=mask)
         rotated_masked_path = output_dir / f"rotated_masked_image_{int(angle)}.png"
-        cv2.imwrite(str(rotated_masked_path), cropped_rotated_image)
+        if meta_params['should_plot_png']:
+            cv2.imwrite(str(rotated_masked_path), cropped_rotated_image)
 
 
         float_mask = mask.astype(np.float32) / 255.0
         mean_power = 0
         highpassed_images = []
         powers = []
+
+
+        kernels_num_white_num_black = meta_params['kernels_num_white_num_black']
+
+        kernels = []
+        for num_white, num_black in kernels_num_white_num_black:
+            kernel = [1] * num_white + [-1] * num_black + [1] * num_white
+            kernels.append(kernel)
+
 
         croped_height, croped_width = cropped_rotated_image.shape
         for kernel in kernels:
@@ -163,12 +168,12 @@ if __name__ == "__main__":
             powers.append(dict(
                 x1=len(kernel)//2,
                 x2=last_x + len(kernel)//2,
-                y=np.array(power),
-                high_pass=np.array(high_pass),
+                y=np.array(power).tolist(),
+                high_pass=np.array(high_pass).tolist(),
             ))
 
 
-        if PLOT_PNG:
+        if meta_params['should_plot_png']:
             cropped_rotated_image_display = cropped_rotated_image.copy()
             cropped_rotated_image = cropped_rotated_image.astype(np.float32) / 255.0
 
@@ -179,10 +184,14 @@ if __name__ == "__main__":
             for power, axx in zip(powers, ax):
                 axx.imshow(cropped_rotated_image_display, cmap='gray')
                 x_axis = np.linspace(power['x1'], power['x2'], len(power['y']))
-                y = power['y'] - power['y'].min()
+                y = np.array(power['y'])    
+                y = y - y.min()
                 y = y / y.max() * cropped_rotated_image.shape[0]//2
                 axx.plot(x_axis, y + cropped_rotated_image.shape[0]//2, color='red', linewidth=2)
-                axx.plot(x_axis, power['high_pass'] * cropped_rotated_image.shape[0]//2 + cropped_rotated_image.shape[0]//2, color='blue', linewidth=2)
+                high_pass = np.array(power['high_pass'])
+                high_pass = high_pass - high_pass.min()
+                high_pass = high_pass / high_pass.max() * cropped_rotated_image.shape[0]//2
+                axx.plot(x_axis, high_pass + cropped_rotated_image.shape[0]//2, color='blue', linewidth=2)
             plt.tight_layout()
             plt.suptitle(f"{label} - {folder_name} - {int(angle)}°")
             plt.savefig(str(output_dir / f"plot_{int(angle)}.png"))
@@ -195,9 +204,8 @@ if __name__ == "__main__":
             bbox=rotated_bbox, 
             mask_path=str(mask_output_path), 
             image_size=cropped_rotated_image.shape[:2], 
-            contour_offset=rotated_bbox[:2]
+            contour_offset=rotated_bbox[:2],
+            angles=powers,
         ))  
     with open(output_dir / "data.json", 'w') as f:
         json.dump(data, f)
-
-    print(f"Processed: {output_dir}")

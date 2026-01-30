@@ -11,9 +11,6 @@ DATA_FOLDER = ROOT_FOLDER / "scan/PLScanDB/"
 PROCESSED_DATA_FOLDER = ROOT_FOLDER / "processed_data/"
 
 
-
-
-
 def load_meta_params():
     with open(ROOT_FOLDER / "meta_params.yml", "r") as f:
         meta_params = yaml.load(f, Loader=yaml.FullLoader)
@@ -61,6 +58,13 @@ def erase_outer_contour(image, contour):
     cv2.fillPoly(mask, [contour], 255)
     masked = cv2.bitwise_and(image, image, mask=mask)
     return masked
+
+
+def get_speed_run_mode(meta_params):
+    if meta_params['speed_run']:
+        return meta_params['fast_test_split_size']
+    else:
+        return 2000
 
 if __name__ == "__main__":
     meta_params = load_meta_params()
