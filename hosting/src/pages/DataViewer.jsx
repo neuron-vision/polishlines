@@ -155,7 +155,10 @@ export default function DataViewer() {
   }
 
   useEffect(() => {
-    const down = e => e.key === 'Shift' && setShiftPressed(true)
+    const down = e => {
+      if (e.key === 'Shift') setShiftPressed(true)
+      if (e.key === 'Escape') { setSelectedImg(null); setModalZoom(1); setPanOffset({ x: 0, y: 0 }) }
+    }
     const up = e => e.key === 'Shift' && setShiftPressed(false)
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
