@@ -20,12 +20,13 @@ flat_angles_save_path: "results/flat_angles_num_folders_100.jsonl"
 cnn_save_path: "cnn_preprocessed/"
 
 # CNN training params
-cnn_min_resolution: 456
-cnn_batch_size: 12
-cnn_lr: 0.00005
-cnn_weight_decay: 0.02
-cnn_epochs: 60
-cnn_patience: 15
-cnn_dropout: 0.5
+cnn_min_resolution: 768
+cnn_batch_size: 4
+cnn_lr: 0.00001
+cnn_weight_decay: 0.05
+cnn_epochs: 100
+cnn_patience: 20
+cnn_dropout: 0.4
 cnn_focal_alpha: 0.5
 cnn_focal_gamma: 2
+hrnet_model: "hrnet_w48"

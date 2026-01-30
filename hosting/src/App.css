@@ -50,6 +50,24 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; }
 .brightness-control input { flex: 1; max-width: 200px; }
 .rotated-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 1rem; }
 .rotated-grid .image-card img { height: auto; max-height: 400px; object-fit: contain; }
+.compile-btn {
+  padding: 6px 16px;
+  background: #3498db;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+.compile-btn:hover {
+  background: #2980b9;
+}
+.embed-res {
+  font-size: 0.85em;
+  color: #666;
+  font-family: monospace;
+}
 .notes-section { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 1rem; }
 .notes-section h2 { margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; }
 .notes-section textarea { width: 100%; padding: 12px; font-size: 1rem; border: 1px solid #ddd; border-radius: 6px; resize: vertical; font-family: inherit; }

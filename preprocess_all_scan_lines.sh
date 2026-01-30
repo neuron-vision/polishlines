@@ -1,6 +1,6 @@
 #!/bin/bash
 
-rm -rf processed_data cnn_preprocessed
+# rm -rf processed_data cnn_preprocessed
 mkdir -p processed_data cnn_preprocessed
 scan_folders=$(venv/bin/python -c "from common_utils import get_list_of_folders; print('\n'.join(get_list_of_folders()))" "$@")
 start_ts=$(date +%s)

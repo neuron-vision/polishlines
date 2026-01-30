@@ -80,3 +80,9 @@ functions/service_accounts/
 *.pt
 train_log.txt
 cnn_preprocessed/
+.firebase/
+node_modules/
+dist/
+.env*
+firebase-debug.log
+firebase-debug.*.log

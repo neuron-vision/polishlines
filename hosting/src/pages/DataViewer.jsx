@@ -3,6 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ref, get, set, push } from 'firebase/database'
 import { db, auth } from '../firebase.js'
 
+const FUNCTIONS_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://127.0.0.1:5001/polish-lines/us-central1'
+  : 'https://us-central1-polish-lines.cloudfunctions.net'
+
 function loadImageData(url) {
   return new Promise((resolve) => {
     const img = new Image()
@@ -142,6 +146,22 @@ export default function DataViewer() {
   const [label, setLabel] = useState('')
   const [availableLabels, setAvailableLabels] = useState([])
   const [labelSaveStatus, setLabelSaveStatus] = useState(null)
+  const [embeddings, setEmbeddings] = useState({})
+
+  const compileImage = async (angle, url) => {
+    setEmbeddings(prev => ({ ...prev, [angle]: 'compiling...' }))
+    try {
+      const res = await fetch(`${FUNCTIONS_URL}/calc_hrnet_w48_embedder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: url })
+      })
+      const data = await res.json()
+      setEmbeddings(prev => ({ ...prev, [angle]: `Size: ${data.vector_size}` }))
+    } catch (err) {
+      setEmbeddings(prev => ({ ...prev, [angle]: `Error: ${err.message}` }))
+    }
+  }
 
   const saveNotes = useCallback((value) => {
     setSaveStatus('saving')
@@ -315,11 +335,16 @@ export default function DataViewer() {
               {unifiedExpanded && (
                 <div className="image-card unified-card" onClick={() => setSelectedImg({ name: 'Unified', url: unifiedUrl })}>
                   <img src={unifiedUrl} alt="Unified" style={{ transform: `scale(${zoom})` }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', background: '#f8f9fa' }}>
+                    <span>Unified Mean</span>
+                    <button className="compile-btn" onClick={(e) => { e.stopPropagation(); compileImage('unified', unifiedUrl) }}>Compile</button>
+                    {embeddings['unified'] && <span className="embed-res">{embeddings['unified']}</span>}
+                  </div>
                 </div>
               )}
             </div>
           )}
-          {rotatedImages.length > 0 && (
+          {rotatedImages.length > 0 ? (
             <div className="rotated-section">
               <h3>Rotated & Masked (by angle)</h3>
               <div className="brightness-control">
@@ -330,10 +355,18 @@ export default function DataViewer() {
                 {rotatedImages.map(({ angle, url }) => (
                   <div key={angle} className="image-card" onClick={() => setSelectedImg({ name: `Angle ${angle}°`, url })}>
                     <img src={url} alt={`Angle ${angle}`} style={{ transform: `scale(${zoom})` }} />
-                    <span>{angle.toFixed(2)}°</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px', background: '#f8f9fa' }}>
+                      <span>{angle.toFixed(2)}°</span>
+                      <button className="compile-btn" onClick={(e) => { e.stopPropagation(); compileImage(angle, url) }}>Compile</button>
+                      {embeddings[angle] && <span className="embed-res">{embeddings[angle]}</span>}
+                    </div>
                   </div>
                 ))}
               </div>
+            </div>
+          ) : (
+            <div className="rotated-section">
+              <p style={{ color: '#999', fontStyle: 'italic' }}>No rotated images available (check Contour and Chosen Facet PD in metadata).</p>
             </div>
           )}
         </section>

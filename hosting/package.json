@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "vite",
+    "functions": "firebase emulators:start --only functions",
     "build": "vite build",
     "preview": "vite preview",
     "deploy:rules": "firebase deploy --only database --project polish-lines",
