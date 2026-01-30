@@ -1,0 +1,109 @@
+plans:
+  - plan_name: baseline
+    notes: "Baseline with current default parameters"
+    params: {}
+
+  - plan_name: single_kernel_1_1
+    notes: "Testing with single minimal kernel [1,1] - simplest edge detection"
+    params:
+      kernels_num_white_num_black: [[1, 1]]
+
+  - plan_name: single_kernel_3_2
+    notes: "Testing with single kernel [3,2] - moderate width"
+    params:
+      kernels_num_white_num_black: [[3, 2]]
+
+  - plan_name: single_kernel_5_3
+    notes: "Testing with single kernel [5,3] - wider detection"
+    params:
+      kernels_num_white_num_black: [[5, 3]]
+
+  - plan_name: single_kernel_5_4
+    notes: "Testing with single kernel [5,4] - widest detection"
+    params:
+      kernels_num_white_num_black: [[5, 4]]
+
+  - plan_name: wide_kernels_only
+    notes: "Testing with only wide kernels [4,2], [5,3], [5,4]"
+    params:
+      kernels_num_white_num_black: [[4, 2], [5, 3], [5, 4]]
+
+  - plan_name: narrow_kernels_only
+    notes: "Testing with only narrow kernels [1,1], [3,2]"
+    params:
+      kernels_num_white_num_black: [[1, 1], [3, 2]]
+
+  - plan_name: low_pass_5
+    notes: "Testing with shorter low pass filter (5) - more high freq detail"
+    params:
+      low_pass_filter_length: 5
+
+  - plan_name: low_pass_20
+    notes: "Testing with longer low pass filter (20) - smoother baseline"
+    params:
+      low_pass_filter_length: 20
+
+  - plan_name: low_pass_30
+    notes: "Testing with even longer low pass filter (30)"
+    params:
+      low_pass_filter_length: 30
+
+  - plan_name: clip_1_99
+    notes: "Testing with tighter high pass clipping [1,99] percentile"
+    params:
+      highpass_clip_low_percentile: 1
+      highpass_clip_high_percentile: 99
+
+  - plan_name: clip_5_95
+    notes: "Testing with wider high pass clipping [5,95] percentile - more outlier removal"
+    params:
+      highpass_clip_low_percentile: 5
+      highpass_clip_high_percentile: 95
+
+  - plan_name: clip_10_90
+    notes: "Testing with aggressive clipping [10,90] percentile"
+    params:
+      highpass_clip_low_percentile: 10
+      highpass_clip_high_percentile: 90
+
+  - plan_name: no_resize
+    notes: "Testing without height resize - original resolution"
+    params:
+      should_resize_height: false
+
+  - plan_name: resize_400
+    notes: "Testing with smaller resize height (400)"
+    params:
+      resized_height: 400
+
+  - plan_name: resize_800
+    notes: "Testing with larger resize height (800)"
+    params:
+      resized_height: 800
+
+  - plan_name: wide_kernel_low_pass_20
+    notes: "Combo: wide kernels + longer low pass filter"
+    params:
+      kernels_num_white_num_black: [[4, 2], [5, 3], [5, 4]]
+      low_pass_filter_length: 20
+
+  - plan_name: narrow_kernel_low_pass_5
+    notes: "Combo: narrow kernels + shorter low pass filter"
+    params:
+      kernels_num_white_num_black: [[1, 1], [3, 2]]
+      low_pass_filter_length: 5
+
+  - plan_name: single_5_3_clip_5_95
+    notes: "Combo: single wide kernel + aggressive clipping"
+    params:
+      kernels_num_white_num_black: [[5, 3]]
+      highpass_clip_low_percentile: 5
+      highpass_clip_high_percentile: 95
+
+  - plan_name: all_wide_aggressive
+    notes: "Combo: wide kernels + longer low pass + aggressive clipping"
+    params:
+      kernels_num_white_num_black: [[4, 2], [5, 3], [5, 4]]
+      low_pass_filter_length: 20
+      highpass_clip_low_percentile: 5
+      highpass_clip_high_percentile: 95
