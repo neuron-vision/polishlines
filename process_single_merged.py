@@ -150,17 +150,15 @@ if __name__ == "__main__":
                 box = cropped_rotated_image[0:croped_height, i:i+len(kernel)]
                 this_mask = float_mask[0:croped_height, i:i+len(kernel)]
                 pattern = box * full_height_kernel * this_mask
-                this_mask_sum = this_mask.sum()
+                this_mask_sum = this_mask.sum() + meta_params['mask_sum_offset']
                 this_power = np.abs(pattern).sum() 
-                if this_mask_sum > 0:
-                    this_power = this_power / this_mask_sum
-                else:
-                    this_power = 0
+                this_power = this_power / this_mask_sum
                 power.append(this_power)
 
             power=np.array(power)
-            # Clip to precentile 5 and 95
-            low_pass = np.convolve(power, np.ones(len(kernel))/len(kernel), mode='same')
+            # Clip to percentile 5 and 95
+            low_pass_filter_length = meta_params['low_pass_filter_length']
+            low_pass = np.convolve(power, np.ones(low_pass_filter_length)/low_pass_filter_length, mode='same')
             high_pass = power - low_pass
             high_pass = np.clip(high_pass, np.percentile(high_pass, meta_params['highpass_clip_low_percentile']), np.percentile(high_pass, meta_params['highpass_clip_high_percentile']))
             high_pass -= high_pass.min()
@@ -171,6 +169,7 @@ if __name__ == "__main__":
                 x2=last_x + len(kernel)//2,
                 y=np.array(power).tolist(),
                 high_pass=np.array(high_pass).tolist(),
+                high_pass_std=float(np.std(high_pass)),
             ))
 
 

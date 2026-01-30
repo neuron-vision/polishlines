@@ -1,15 +1,20 @@
-highpass_clip_low_percentile: 5
-highpass_clip_high_percentile: 95
-should_plot_png: false
+highpass_clip_low_percentile: 2
+highpass_clip_high_percentile: 99
+should_plot_png: true
 
 kernels_num_white_num_black: [
     [1, 1],
     [3, 2],
     [3, 2],
+    [4, 2],
     [5, 3],
+    [5, 4],
 ]
 
-resized_height: 100
+
+mask_sum_offset: 400 # add this to the mask sum to avoid division by zero
+low_pass_filter_length: 10
+resized_height: 600
 should_resize_height: true
-num_folders: 100
+num_folders: 40
 flat_angles_save_path: "results/flat_angles_num_folders_100.jsonl"
