@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ref, get, set } from 'firebase/database'
-import { db } from '../firebase.js'
+import { ref, get, set, push } from 'firebase/database'
+import { db, auth } from '../firebase.js'
 
 function loadImageData(url) {
   return new Promise((resolve) => {
@@ -127,6 +127,7 @@ export default function DataViewer() {
   const [rotatedImages, setRotatedImages] = useState([])
   const [unifiedExpanded, setUnifiedExpanded] = useState(false)
   const [metaExpanded, setMetaExpanded] = useState(false)
+  const [auditExpanded, setAuditExpanded] = useState(false)
   const [brightness, setBrightness] = useState(100)
   const [imageData, setImageData] = useState(null)
   const [modalZoom, setModalZoom] = useState(1)
@@ -138,14 +139,44 @@ export default function DataViewer() {
   const [notes, setNotes] = useState('')
   const [saveStatus, setSaveStatus] = useState(null)
   const saveTimeoutRef = useRef(null)
+  const [label, setLabel] = useState('')
+  const [availableLabels, setAvailableLabels] = useState([])
+  const [labelSaveStatus, setLabelSaveStatus] = useState(null)
 
   const saveNotes = useCallback((value) => {
     setSaveStatus('saving')
-    set(ref(db, `folders/${folderName}/notes`), value).then(() => {
+    const now = new Date().toISOString()
+    Promise.all([
+      set(ref(db, `folders/${folderName}/notes`), value),
+      set(ref(db, `folders/${folderName}/last_update`), now)
+    ]).then(() => {
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus(null), 2000)
     })
   }, [folderName])
+
+  const saveLabel = useCallback((newLabel) => {
+    const oldLabel = label
+    if (newLabel === oldLabel) return
+    setLabelSaveStatus('saving')
+    const now = new Date().toISOString()
+    const user = auth.currentUser
+    const auditEntry = {
+      user: user?.displayName || user?.email || 'unknown',
+      timestamp: now,
+      from: oldLabel,
+      to: newLabel
+    }
+    Promise.all([
+      set(ref(db, `folders/${folderName}/User Input`), newLabel),
+      set(ref(db, `folders/${folderName}/last_update`), now),
+      push(ref(db, `folders/${folderName}/audit`), auditEntry)
+    ]).then(() => {
+      setLabel(newLabel)
+      setLabelSaveStatus('saved')
+      setTimeout(() => setLabelSaveStatus(null), 2000)
+    })
+  }, [folderName, label])
 
   const handleNotesChange = e => {
     const value = e.target.value
@@ -179,11 +210,17 @@ export default function DataViewer() {
   const handleMouseUp = () => setDragging(false)
 
   useEffect(() => {
-    get(ref(db, `folders/${folderName}`)).then(snap => {
+    get(ref(db, 'folders')).then(snap => {
       if (snap.exists()) {
-        const d = snap.val()
-        setData(d)
-        setNotes(d.notes || '')
+        const all = snap.val()
+        const labels = [...new Set(Object.values(all).map(f => f['User Input'] || f.label || '').filter(Boolean))].sort()
+        setAvailableLabels(labels)
+        const d = all[folderName]
+        if (d) {
+          setData(d)
+          setNotes(d.notes || '')
+          setLabel(d['User Input'] || d.label || '')
+        }
       }
     })
   }, [folderName])
@@ -234,7 +271,6 @@ export default function DataViewer() {
   if (!data) return <div className="loading">Loading...</div>
 
   const images = data.download_links || {}
-  const label = data['User Input'] || data.label || ''
   const meta = { ...data }
   delete meta.download_links
   delete meta.Contour
@@ -244,6 +280,15 @@ export default function DataViewer() {
       <header>
         <button onClick={() => navigate('/all_items')}>&larr; Back</button>
         <h1>Folder: {folderName} {label && `- ${label}`}</h1>
+        <div className="label-edit">
+          <label>Label:</label>
+          <select value={label} onChange={e => saveLabel(e.target.value)}>
+            <option value="">-- Select --</option>
+            {availableLabels.map(l => <option key={l} value={l}>{l}</option>)}
+          </select>
+          {labelSaveStatus === 'saving' && <span className="save-status updating">updating...</span>}
+          {labelSaveStatus === 'saved' && <span className="save-status done">✓</span>}
+        </div>
       </header>
 
       <div className="content">
@@ -305,6 +350,29 @@ export default function DataViewer() {
           />
         </section>
 
+        <section className="audit-section">
+          <h2 className="foldable-header" onClick={() => setAuditExpanded(!auditExpanded)}>
+            {auditExpanded ? '▼' : '▶'} Audit Log
+          </h2>
+          {auditExpanded && data.audit && (
+            <table className="audit-table">
+              <thead>
+                <tr><th>Time</th><th>User</th><th>Change</th></tr>
+              </thead>
+              <tbody>
+                {Object.values(data.audit).sort((a, b) => b.timestamp.localeCompare(a.timestamp)).map((entry, i) => (
+                  <tr key={i}>
+                    <td>{new Date(entry.timestamp).toLocaleString()}</td>
+                    <td>{entry.user}</td>
+                    <td>{entry.from} → {entry.to}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {auditExpanded && !data.audit && <p>No audit entries yet.</p>}
+        </section>
+
         <section className="meta-section">
           <h2 className="foldable-header" onClick={() => setMetaExpanded(!metaExpanded)}>
             {metaExpanded ? '▼' : '▶'} Metadata
@@ -329,7 +397,10 @@ export default function DataViewer() {
           <div className="modal-content" onClick={e => e.stopPropagation()} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
             <button className="close-btn" onClick={() => { setSelectedImg(null); setModalZoom(1); setPanOffset({ x: 0, y: 0 }) }}>&times;</button>
             <h3>{selectedImg.name} ({Math.round(modalZoom * 100)}%)</h3>
-            <div className="modal-image-container">
+            <div className="modal-image-container" onWheel={e => {
+                e.preventDefault()
+                setPanOffset(p => ({ x: p.x - e.deltaX, y: p.y - e.deltaY }))
+              }}>
               <img 
                 src={selectedImg.url} 
                 alt={selectedImg.name}

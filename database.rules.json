@@ -3,9 +3,10 @@
     ".read": "auth != null",
     "folders": {
       "$folderId": {
-        "notes": {
-          ".write": "auth != null"
-        }
+        "notes": { ".write": "auth != null" },
+        "User Input": { ".write": "auth != null" },
+        "last_update": { ".write": "auth != null" },
+        "audit": { ".write": "auth != null" }
       }
     }
   }

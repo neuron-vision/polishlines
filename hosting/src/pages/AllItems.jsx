@@ -31,6 +31,8 @@ export default function AllItems() {
 
   const getLabel = f => f["User Input"] || f.label || ''
   const getNotes = f => f.notes || ''
+  const getLastUpdate = f => f.last_update || ''
+  const formatDate = d => d ? new Date(d).toLocaleString() : '-'
   const uniqueLabels = [...new Set(folders.map(getLabel))].filter(Boolean).sort()
   const filtered = folders
     .filter(f => {
@@ -43,6 +45,7 @@ export default function AllItems() {
       if (sortBy === 'name') { va = a.name; vb = b.name }
       else if (sortBy === 'label') { va = getLabel(a); vb = getLabel(b) }
       else if (sortBy === 'notes') { va = getNotes(a); vb = getNotes(b) }
+      else if (sortBy === 'last_update') { va = getLastUpdate(a); vb = getLastUpdate(b) }
       else { va = a.name; vb = b.name }
       const cmp = va.localeCompare(vb)
       return sortDir === 'asc' ? cmp : -cmp
@@ -75,6 +78,7 @@ export default function AllItems() {
               <th className="sortable" onClick={() => toggleSort('label')}>Label{sortIcon('label')}</th>
               <th>Stone Name</th>
               <th className="sortable" onClick={() => toggleSort('notes')}>Notes{sortIcon('notes')}</th>
+              <th className="sortable" onClick={() => toggleSort('last_update')}>Last Update{sortIcon('last_update')}</th>
             </tr>
           </thead>
           <tbody>
@@ -84,6 +88,7 @@ export default function AllItems() {
                 <td>{f["User Input"] || f.label || '-'}</td>
                 <td>{f["Stone Name"] || '-'}</td>
                 <td className="notes-cell">{f.notes || '-'}</td>
+                <td>{formatDate(f.last_update)}</td>
               </tr>
             ))}
           </tbody>
