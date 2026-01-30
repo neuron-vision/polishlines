@@ -5,8 +5,8 @@ import * as ort from 'onnxruntime-web'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
 
-// Configure WASM paths to look in the public folder
-ort.env.wasm.wasmPaths = '/'
+// Configure WASM paths to look in the onnx-bin folder
+ort.env.wasm.wasmPaths = window.location.origin + '/onnx-bin/'
 ort.env.wasm.numThreads = 1 // Use single thread for stability
 
 export default function Train() {
