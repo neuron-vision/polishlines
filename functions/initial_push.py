@@ -53,7 +53,8 @@ for folder in tqdm(sorted(all_folders)):
         **extra_data.get("Polish Lines Data", {}),
         **contour_data.get("Contour Data", {}),
         "download_links": download_links,
-        "label": label
+        "label": label,
+        "angles": extra_data.get("Polish Lines Data", {}).get("Chosen Facet PD", None)
     }
     ref.child(folder_name).set(doc_data)
     print(f"  RTDB updated")

@@ -8,6 +8,7 @@ import sys
 ROOT_FOLDER = Path(__file__).parent
 DATA_FOLDER = ROOT_FOLDER / "scan/PLScanDB/"
 PROCESSED_DATA_FOLDER = ROOT_FOLDER / "processed_data/"
+CNN_PREPROCESSED_FOLDER = ROOT_FOLDER / "cnn_preprocessed/"
 
 
 def load_meta_params():
@@ -61,8 +62,8 @@ def erase_outer_contour(image, contour):
 def get_list_of_folders():
     meta_params = load_meta_params()
     num_folders = meta_params['num_folders']
-    all_folders = list(Path(DATA_FOLDER).glob("*"))[:num_folders]
-    full_folders_names = [f"{DATA_FOLDER}/{folder.name}" for folder in all_folders if folder.is_dir()]
+    full_folders_names = [f"{DATA_FOLDER}/{folder.name}" for folder in Path(DATA_FOLDER).glob("*") if folder.is_dir()]
+    full_folders_names = full_folders_names[:num_folders]
     return full_folders_names
 
 def gather_all_data():
@@ -77,6 +78,11 @@ def gather_all_data():
     return all_data
 
 if __name__ == "__main__":
+    meta_params = load_meta_params()
+    num_folders = meta_params['num_folders']
+    full_folders_names = [f"{DATA_FOLDER}/{folder.name}" for folder in Path(DATA_FOLDER).glob("*") if folder.is_dir()]
+    full_folders_names = full_folders_names[:num_folders]
+
     all_data = gather_all_data()
     print(f"Number of data: {len(all_data)}")
     print(all_data[0])

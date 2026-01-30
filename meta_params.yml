@@ -11,10 +11,21 @@ kernels_num_white_num_black: [
     [5, 4],
 ]
 
-
-mask_sum_offset: 400 # add this to the mask sum to avoid division by zero
+mask_sum_offset: 400
 low_pass_filter_length: 10
 resized_height: 600
 should_resize_height: true
-num_folders: 200
+num_folders: 1400
 flat_angles_save_path: "results/flat_angles_num_folders_100.jsonl"
+cnn_save_path: "cnn_preprocessed/"
+
+# CNN training params
+cnn_min_resolution: 456
+cnn_batch_size: 12
+cnn_lr: 0.00005
+cnn_weight_decay: 0.02
+cnn_epochs: 60
+cnn_patience: 15
+cnn_dropout: 0.5
+cnn_focal_alpha: 0.5
+cnn_focal_gamma: 2
