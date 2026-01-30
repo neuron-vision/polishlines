@@ -11,5 +11,5 @@ kernels_num_white_num_black: [
 
 resized_height: 100
 should_resize_height: true
-fast_test_split_size: 200
-speed_run: true
+num_folders: 100
+flat_angles_save_path: "results/flat_angles_num_folders_100.jsonl"

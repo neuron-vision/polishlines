@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 import json
-import matplotlib.pyplot as plt
 from pathlib import Path
 import yaml
 import sys
@@ -59,13 +58,37 @@ def erase_outer_contour(image, contour):
     masked = cv2.bitwise_and(image, image, mask=mask)
     return masked
 
+def get_list_of_folders():
+    meta_params = load_meta_params()
+    num_folders = meta_params['num_folders']
+    all_folders = list(Path(DATA_FOLDER).glob("*"))[:num_folders]
+    full_folders_names = [f"{DATA_FOLDER}/{folder.name}" for folder in all_folders if folder.is_dir()]
+    return full_folders_names
 
-def get_speed_run_mode(meta_params):
-    if meta_params['speed_run']:
-        return meta_params['fast_test_split_size']
-    else:
-        return 2000
+def gather_all_data():
+    all_folders = list(PROCESSED_DATA_FOLDER.glob("**/data.json"))
+    all_data = []
+    for data_path in all_folders:
+        with open(data_path, "r") as f:
+            data = json.load(f)
+            data['folder_name'] = data_path.parent.name
+            data['folder_label'] = data_path.parent.parent.name
+            all_data.append(data)
+    return all_data
 
 if __name__ == "__main__":
-    meta_params = load_meta_params()
-    print(meta_params)
+    all_data = gather_all_data()
+    print(f"Number of data: {len(all_data)}")
+    print(all_data[0])
+    print(all_data[0]['folder_name'])
+    print(all_data[0]['folder_label'])
+    print(all_data[0]['angles'])
+    print(all_data[0]['rotated_images'])
+    print(all_data[0]['filtered_images'])
+    print(all_data[0]['mean_power'])
+    print(all_data[0]['image_path'])
+    print(all_data[0]['mask_path'])
+    print(all_data[0]['image_size'])
+    print(all_data[0]['contour_offset'])
+    print(all_data[0]['contour'])
+    print(all_data[0]['bbox'])

@@ -128,7 +128,6 @@ if __name__ == "__main__":
         float_mask = mask.astype(np.float32) / 255.0
         mean_power = 0
         highpassed_images = []
-        powers = []
 
 
         kernels_num_white_num_black = meta_params['kernels_num_white_num_black']
@@ -140,6 +139,8 @@ if __name__ == "__main__":
 
 
         croped_height, croped_width = cropped_rotated_image.shape
+        powers = []
+
         for kernel in kernels:
             full_height_kernel = np.repeat([kernel], cropped_rotated_image.shape[0], axis=0).reshape(cropped_rotated_image.shape[0], -1).astype(np.float32)  #
             last_x = croped_width - len(kernel)
@@ -174,6 +175,7 @@ if __name__ == "__main__":
 
 
         if meta_params['should_plot_png']:
+            plt.ioff()
             cropped_rotated_image_display = cropped_rotated_image.copy()
             cropped_rotated_image = cropped_rotated_image.astype(np.float32) / 255.0
 
@@ -205,7 +207,7 @@ if __name__ == "__main__":
             mask_path=str(mask_output_path), 
             image_size=cropped_rotated_image.shape[:2], 
             contour_offset=rotated_bbox[:2],
-            angles=powers,
+            powers=powers,
         ))  
     with open(output_dir / "data.json", 'w') as f:
         json.dump(data, f)
