@@ -6,3 +6,6 @@ torch
 torchvision
 timm
 Pillow
+onnx
+onnxruntime
+onnxscript

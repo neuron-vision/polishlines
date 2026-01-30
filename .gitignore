@@ -86,3 +86,5 @@ dist/
 .env*
 firebase-debug.log
 firebase-debug.*.log
+*.onnx
+*.onnx.data

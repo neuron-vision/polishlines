@@ -39,32 +39,28 @@ def calc_hrnet_w48_embedder(req: https_fn.Request) -> https_fn.Response:
         })
     
     headers = {"Access-Control-Allow-Origin": "*"}
-    try:
-        data = req.get_json()
-        image_b64 = data.get("image")
-        if not image_b64:
-            return https_fn.Response("Missing image", status=400, headers=headers)
+    data = req.get_json(force=True)
+    image_b64 = data.get("image")
+    if not image_b64:
+        return https_fn.Response("Missing image", status=400, headers=headers)
+    
+    image_data = base64.b64decode(image_b64.split(",")[-1])
+    img = Image.open(io.BytesIO(image_data)).convert("L")
+    img = img.resize((1024, 1024))
+    
+    img_arr = np.array(img).astype(np.float32) / 255.0
+    img_arr = np.stack([img_arr] * 3, axis=-1)
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+    img_arr = (img_arr - mean) / std
+    img_tensor = torch.from_numpy(img_arr.transpose(2, 0, 1)).unsqueeze(0).float()
+    
+    with torch.no_grad():
+        features = get_model()(img_tensor)
+        vector = features.squeeze(0).cpu().numpy().tolist()
         
-        image_data = base64.b64decode(image_b64.split(",")[-1])
-        img = Image.open(io.BytesIO(image_data)).convert("RGB")
-        img = img.resize((224, 224))
-        
-        img_arr = np.array(img).astype(np.float32) / 255.0
-        mean = np.array([0.485, 0.456, 0.406])
-        std = np.array([0.229, 0.224, 0.225])
-        img_arr = (img_arr - mean) / std
-        img_tensor = torch.from_numpy(img_arr.transpose(2, 0, 1)).unsqueeze(0).float()
-        
-        with torch.no_grad():
-            features = get_model()(img_tensor)
-            vector = features.squeeze(0).cpu().numpy().tolist()
-            
-        return https_fn.Response(
-            json.dumps({"vector_size": len(vector)}),
-            mimetype="application/json",
-            headers=headers
-        )
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return https_fn.Response(str(e), status=500, headers=headers)
+    return https_fn.Response(
+        json.dumps({"vector_size": len(vector)}),
+        mimetype="application/json",
+        headers=headers
+    )
