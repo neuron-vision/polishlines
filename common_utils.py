@@ -3,13 +3,18 @@ import numpy as np
 import json
 import matplotlib.pyplot as plt
 from pathlib import Path
-
+import yaml
 
 ROOT_FOLDER = Path(__file__).parent
 DATA_FOLDER = ROOT_FOLDER / "scan/PLScanDB/"
 PROCESSED_DATA_FOLDER = ROOT_FOLDER / "processed_data/"
 
-DEFAULT_IMAGE_SIZE = (512, 512)
+
+
+def load_meta_params():
+    with open(ROOT_FOLDER / "meta_params.yml", "r") as f:
+        meta_params = yaml.load(f, Loader=yaml.FullLoader)
+    return meta_params
 
 def crop_from_contour(image, contour):
     contour = np.array(contour, dtype=np.int32)

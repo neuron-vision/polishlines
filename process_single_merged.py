@@ -5,9 +5,15 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
-from common_utils import erase_outer_contour, crop_from_contour, DEFAULT_IMAGE_SIZE
+from common_utils import erase_outer_contour, crop_from_contour, DEFAULT_IMAGE_SIZE, load_meta_params
 from common_utils import ROOT_FOLDER, DATA_FOLDER, PROCESSED_DATA_FOLDER
 import sys
+
+meta_params = load_meta_params()
+PLOT_PNG = meta_params['should_plot_png']
+
+kernels_num_white_num_black = meta_params['kernels_num_white_num_black']
+
 f'''
 For given folder,
 Load all images in the folder
@@ -24,22 +30,10 @@ add the offest contur to the data.json
 '''
 
 
-kernels_num_white_num_black = [
-    [3, 2],
-    [3, 3],
-    [5, 5],
-    [7, 7],
-    [9, 9],
-    [11, 11],
-    [13, 13],
-]
-
 kernels = []
 for num_white, num_black in kernels_num_white_num_black:
     kernel = [1] * num_white + [-1] * num_black + [1] * num_white
     kernels.append(kernel)
-
-PLOT_PNG = True
 
 
 def flatten_dict(d, parent_key='', sep='_'):
@@ -56,7 +50,7 @@ def flatten_dict(d, parent_key='', sep='_'):
 
 if __name__ == "__main__":
     
-    input_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("scan/PLScanDB/1003")
+    input_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("scan/PLScanDB/1054")
     folder_name = input_path.name
     
     
@@ -111,12 +105,6 @@ if __name__ == "__main__":
     data['image_size'] = cropped.shape[:2]
 
     h, w = cropped.shape
-    kernel_length = (h**2 + w**2)**0.5
-    cropped_image_center = (w // 2, h // 2)
-    color_image = cv2.cvtColor(cropped, cv2.COLOR_GRAY2BGR)
-    thickness = 2
-    colors = [(0, 0, 255), (0, 255, 0), (255, 0, 0), (255, 255, 0), (255, 0, 255), (0, 255, 255)]
-    step = 5
 
     data['rotated_images'] = []
     data['filtered_images'] = []
@@ -146,37 +134,56 @@ if __name__ == "__main__":
         float_mask = mask.astype(np.float32) / 255.0
         mean_power = 0
         highpassed_images = []
-        for kernel in kernels:
-            full_height_kernel = np.repeat([kernel], cropped_rotated_image.shape[0], axis=0).reshape(cropped_rotated_image.shape[0], -1).astype(np.float32)
-            full_height_kernel = full_height_kernel / float(full_height_kernel.sum())
-            cropped_rotated_image_mean = cropped_rotated_image.mean()
-            highpassed = cv2.filter2D(cropped_rotated_image - cropped_rotated_image_mean, -1, full_height_kernel)
-            highpassed = highpassed * float_mask
-            power = (highpassed * highpassed / float_mask.mean()).mean()
-            mean_power += power
+        powers = []
 
-            highpassed += cropped_rotated_image_mean
-            highpassed *= 255.0
-            highpassed = (highpassed.astype(np.uint8))
-            cv2.imwrite(str(output_dir / f"{power}_highpassed_{int(angle)}_{kernel}.png"), highpassed)
-            highpassed_images.append((highpassed, f"k={len(kernel)}, p={power:.4f}"))
+        croped_height, croped_width = cropped_rotated_image.shape
+        for kernel in kernels:
+            full_height_kernel = np.repeat([kernel], cropped_rotated_image.shape[0], axis=0).reshape(cropped_rotated_image.shape[0], -1).astype(np.float32)  #
+            last_x = croped_width - len(kernel)
+            this_power = 0
+            power = []
+            for i in range(last_x):
+                box = cropped_rotated_image[0:croped_height, i:i+len(kernel)]
+                this_mask = float_mask[0:croped_height, i:i+len(kernel)]
+                pattern = box * full_height_kernel * this_mask
+                this_mask_sum = this_mask.sum()
+                this_power = np.abs(pattern).sum() 
+                if this_mask_sum > 0:
+                    this_power = this_power / this_mask_sum
+                else:
+                    this_power = 0
+                power.append(this_power)
+
+            power=np.array(power)
+            # Clip to precentile 5 and 95
+            low_pass = np.convolve(power, np.ones(len(kernel))/len(kernel), mode='same')
+            high_pass = power - low_pass
+            high_pass = np.clip(high_pass, np.percentile(high_pass, meta_params['highpass_clip_low_percentile']), np.percentile(high_pass, meta_params['highpass_clip_high_percentile']))
+            high_pass -= high_pass.min()
+            high_pass /= high_pass.max()
+
+            powers.append(dict(
+                x1=len(kernel)//2,
+                x2=last_x + len(kernel)//2,
+                y=np.array(power),
+                high_pass=np.array(high_pass),
+            ))
+
 
         if PLOT_PNG:
-            n_images = 1 + len(highpassed_images)
-            grid_size = math.ceil(math.sqrt(n_images))
-            fig, axes = plt.subplots(grid_size, grid_size, figsize=(grid_size * 6, grid_size * 6))
-            axes = axes.flatten()
-            axes[0].imshow(cropped_rotated_image_display, cmap='gray')
-            axes[0].set_title(f"Rotated {int(angle)}°")
-            axes[0].axis('off')
-            for i, (hp_img, title) in enumerate(highpassed_images):
-                axes[i + 1].imshow(hp_img, cmap='gray')
-                axes[i + 1].set_title(title)
-                axes[i + 1].axis('off')
-            for i in range(n_images, len(axes)):
-                axes[i].axis('off')
-            fig.suptitle(f"{label} - {folder_name}")
+            num_subplot = len(powers)
+            num_rows = math.ceil(num_subplot ** 0.5)
+            fig, ax = plt.subplots(num_rows, num_rows, figsize=(25, 25))
+            ax = np.ravel(ax).flatten()
+            for power, axx in zip(powers, ax):
+                axx.imshow(cropped_rotated_image_display, cmap='gray')
+                x_axis = np.linspace(power['x1'], power['x2'], len(power['y']))
+                y = power['y'] - power['y'].min()
+                y = y / y.max() * cropped_rotated_image.shape[0]//2
+                axx.plot(x_axis, y + cropped_rotated_image.shape[0]//2, color='red', linewidth=2)
+                axx.plot(x_axis, power['high_pass'] * cropped_rotated_image.shape[0]//2 + cropped_rotated_image.shape[0]//2, color='blue', linewidth=2)
             plt.tight_layout()
+            plt.suptitle(f"{label} - {folder_name} - {int(angle)}°")
             plt.savefig(str(output_dir / f"plot_{int(angle)}.png"))
             plt.close()
 
@@ -187,8 +194,7 @@ if __name__ == "__main__":
             bbox=rotated_bbox, 
             mask_path=str(mask_output_path), 
             image_size=cropped_rotated_image.shape[:2], 
-            contour_offset=rotated_bbox[:2], 
-            mean_power=float(mean_power / len(kernels)),
+            contour_offset=rotated_bbox[:2]
         ))  
     with open(output_dir / "data.json", 'w') as f:
         json.dump(data, f)

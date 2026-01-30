@@ -70,3 +70,4 @@ processed_data/
 scan/
 *.pth
 highpass_results.json
+rules
