@@ -55,7 +55,10 @@ export default function AllItems() {
     <div className="all-items-page">
       <header>
         <h1>All Items</h1>
-        <button onClick={() => signOut(auth)}>Logout</button>
+        <div style={{ display: 'flex', gap: '1rem' }}>
+          <button onClick={() => navigate('/train')}>Train Page</button>
+          <button onClick={() => signOut(auth)}>Logout</button>
+        </div>
       </header>
       <div className="filters-row">
         <input
