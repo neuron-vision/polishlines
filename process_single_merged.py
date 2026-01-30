@@ -5,6 +5,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from pathlib import Path
+from scipy import ndimage
 from common_utils import load_meta_params
 from common_utils import ROOT_FOLDER, DATA_FOLDER, PROCESSED_DATA_FOLDER
 
@@ -164,12 +165,37 @@ if __name__ == "__main__":
             high_pass -= high_pass.min()
             high_pass /= high_pass.max()
 
+            hp_arr = np.array(high_pass)
+            # Count peaks (local maxima above mean)
+            hp_mean = np.mean(hp_arr)
+            peaks = np.sum((hp_arr[1:-1] > hp_arr[:-2]) & (hp_arr[1:-1] > hp_arr[2:]) & (hp_arr[1:-1] > hp_mean + 0.1))
+            # FFT features
+            fft = np.abs(np.fft.rfft(hp_arr))
+            fft_energy = np.sum(fft[1:]**2)  # exclude DC
+            fft_peak_freq = np.argmax(fft[1:]) + 1 if len(fft) > 1 else 0
+            fft_peak_mag = fft[fft_peak_freq] if fft_peak_freq < len(fft) else 0
+            # Autocorrelation for periodicity
+            autocorr = np.correlate(hp_arr - hp_mean, hp_arr - hp_mean, mode='full')
+            autocorr = autocorr[len(autocorr)//2:]
+            autocorr = autocorr / (autocorr[0] + 1e-10)
+            # Find first significant peak after lag 0
+            ac_peaks = np.where((autocorr[1:-1] > autocorr[:-2]) & (autocorr[1:-1] > autocorr[2:]) & (autocorr[1:-1] > 0.1))[0]
+            periodicity = autocorr[ac_peaks[0] + 1] if len(ac_peaks) > 0 else 0
             powers.append(dict(
                 x1=len(kernel)//2,
                 x2=last_x + len(kernel)//2,
                 y=np.array(power).tolist(),
-                high_pass=np.array(high_pass).tolist(),
-                high_pass_std=float(np.std(high_pass)),
+                high_pass=hp_arr.tolist(),
+                high_pass_std=float(np.std(hp_arr)),
+                high_pass_max=float(np.max(hp_arr)),
+                high_pass_range=float(np.max(hp_arr) - np.min(hp_arr)),
+                high_pass_mean=float(hp_mean),
+                high_pass_energy=float(np.sum(hp_arr**2)),
+                high_pass_peaks=int(peaks),
+                fft_energy=float(fft_energy),
+                fft_peak_freq=int(fft_peak_freq),
+                fft_peak_mag=float(fft_peak_mag),
+                periodicity=float(periodicity),
             ))
 
 
@@ -198,6 +224,25 @@ if __name__ == "__main__":
             plt.savefig(str(output_dir / f"plot_{int(angle)}.png"))
             plt.close()
 
+        # Gabor filter response for this angle (detect polish lines)
+        gabor_responses = []
+        for freq in [0.05, 0.1, 0.15, 0.2]:  # different spatial frequencies
+            kern = cv2.getGaborKernel((21, 21), 4.0, 0, freq * 100, 0.5, 0, ktype=cv2.CV_32F)
+            filtered = cv2.filter2D(cropped_rotated_image.astype(np.float32), cv2.CV_32F, kern)
+            filtered_masked = filtered * float_mask
+            gabor_energy = float(np.sum(filtered_masked**2) / (np.sum(float_mask) + 1))
+            gabor_responses.append(gabor_energy)
+        
+        # Sobel edge response (horizontal edges = polish lines)
+        sobel_x = cv2.Sobel(cropped_rotated_image, cv2.CV_64F, 1, 0, ksize=3)
+        sobel_y = cv2.Sobel(cropped_rotated_image, cv2.CV_64F, 0, 1, ksize=3)
+        sobel_x_masked = sobel_x * float_mask
+        sobel_y_masked = sobel_y * float_mask
+        sobel_x_energy = np.sum(sobel_x_masked**2) / (np.sum(float_mask) + 1)
+        sobel_y_energy = np.sum(sobel_y_masked**2) / (np.sum(float_mask) + 1)
+        # Vertical edges (polish lines are horizontal after rotation) = sobel_x
+        edge_ratio = sobel_x_energy / (sobel_y_energy + 1e-10)
+        
         data['rotated_images'].append(dict(
             angle=angle, 
             image_path=str(rotated_masked_path),
@@ -207,6 +252,10 @@ if __name__ == "__main__":
             image_size=cropped_rotated_image.shape[:2], 
             contour_offset=rotated_bbox[:2],
             powers=powers,
+            gabor_responses=gabor_responses,
+            sobel_x_energy=float(sobel_x_energy),
+            sobel_y_energy=float(sobel_y_energy),
+            edge_ratio=float(edge_ratio),
         ))  
     with open(output_dir / "data.json", 'w') as f:
         json.dump(data, f)

@@ -107,3 +107,62 @@ plans:
       low_pass_filter_length: 20
       highpass_clip_low_percentile: 5
       highpass_clip_high_percentile: 95
+
+  - plan_name: low_pass_3
+    notes: "Very short low pass filter (3) - maximum high freq sensitivity"
+    params:
+      low_pass_filter_length: 3
+
+  - plan_name: single_kernel_2_1
+    notes: "Single kernel [2,1] - small asymmetric edge"
+    params:
+      kernels_num_white_num_black: [[2, 1]]
+
+  - plan_name: narrow_lp3
+    notes: "Combo: narrow kernels + very short low pass (3)"
+    params:
+      kernels_num_white_num_black: [[1, 1], [2, 1], [3, 2]]
+      low_pass_filter_length: 3
+
+  - plan_name: best_combo_v1
+    notes: "Combo: low_pass_5 winner params with added narrow kernels"
+    params:
+      kernels_num_white_num_black: [[1, 1], [2, 1], [3, 2]]
+      low_pass_filter_length: 5
+
+  - plan_name: very_narrow_lp5
+    notes: "Only minimal kernels [1,1] [2,1] with low_pass_5"
+    params:
+      kernels_num_white_num_black: [[1, 1], [2, 1]]
+      low_pass_filter_length: 5
+
+  - plan_name: single_2_1_lp5
+    notes: "Single [2,1] kernel with low_pass_5 - testing simplest edge"
+    params:
+      kernels_num_white_num_black: [[2, 1]]
+      low_pass_filter_length: 5
+
+  - plan_name: wide_lp20_resize800
+    notes: "Combo: wide kernels + long low pass + larger resolution for detail"
+    params:
+      kernels_num_white_num_black: [[4, 2], [5, 3], [5, 4]]
+      low_pass_filter_length: 20
+      resized_height: 800
+
+  - plan_name: many_kernels
+    notes: "Many kernel sizes to capture different polish line widths"
+    params:
+      kernels_num_white_num_black: [[1, 1], [2, 1], [3, 2], [4, 2], [5, 3], [6, 3], [7, 4]]
+      low_pass_filter_length: 10
+
+  - plan_name: very_wide_kernels
+    notes: "Very wide kernels for broader polish lines"
+    params:
+      kernels_num_white_num_black: [[6, 3], [7, 4], [8, 4], [9, 5]]
+      low_pass_filter_length: 15
+
+  - plan_name: wide_lp15
+    notes: "Wide kernels with moderate low pass"
+    params:
+      kernels_num_white_num_black: [[4, 2], [5, 3], [5, 4]]
+      low_pass_filter_length: 15
