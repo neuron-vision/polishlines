@@ -7,8 +7,17 @@ import { db, auth } from '../firebase.js'
 export default function AllItems() {
   const [folders, setFolders] = useState([])
   const [filter, setFilter] = useState('')
+  const [labelFilter, setLabelFilter] = useState('')
   const [loading, setLoading] = useState(true)
+  const [sortBy, setSortBy] = useState('name')
+  const [sortDir, setSortDir] = useState('asc')
   const navigate = useNavigate()
+
+  const toggleSort = col => {
+    if (sortBy === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortBy(col); setSortDir('asc') }
+  }
+  const sortIcon = col => sortBy === col ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''
 
   useEffect(() => {
     get(ref(db, 'folders')).then(snap => {
@@ -20,7 +29,24 @@ export default function AllItems() {
     })
   }, [])
 
-  const filtered = folders.filter(f => f.name.includes(filter))
+  const getLabel = f => f["User Input"] || f.label || ''
+  const getNotes = f => f.notes || ''
+  const uniqueLabels = [...new Set(folders.map(getLabel))].filter(Boolean).sort()
+  const filtered = folders
+    .filter(f => {
+      const matchesName = f.name.includes(filter)
+      const matchesLabel = !labelFilter || getLabel(f) === labelFilter
+      return matchesName && matchesLabel
+    })
+    .sort((a, b) => {
+      let va, vb
+      if (sortBy === 'name') { va = a.name; vb = b.name }
+      else if (sortBy === 'label') { va = getLabel(a); vb = getLabel(b) }
+      else if (sortBy === 'notes') { va = getNotes(a); vb = getNotes(b) }
+      else { va = a.name; vb = b.name }
+      const cmp = va.localeCompare(vb)
+      return sortDir === 'asc' ? cmp : -cmp
+    })
 
   return (
     <div className="all-items-page">
@@ -28,20 +54,27 @@ export default function AllItems() {
         <h1>All Items</h1>
         <button onClick={() => signOut(auth)}>Logout</button>
       </header>
-      <input
-        type="text"
-        placeholder="Filter by folder name..."
-        value={filter}
-        onChange={e => setFilter(e.target.value)}
-        className="filter-input"
-      />
+      <div className="filters-row">
+        <input
+          type="text"
+          placeholder="Filter by folder name..."
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+          className="filter-input"
+        />
+        <select value={labelFilter} onChange={e => setLabelFilter(e.target.value)} className="label-filter">
+          <option value="">All Labels</option>
+          {uniqueLabels.map(l => <option key={l} value={l}>{l}</option>)}
+        </select>
+      </div>
       {loading ? <p>Loading...</p> : (
         <table className="items-table">
           <thead>
             <tr>
-              <th>Folder</th>
-              <th>Label</th>
+              <th className="sortable" onClick={() => toggleSort('name')}>Folder{sortIcon('name')}</th>
+              <th className="sortable" onClick={() => toggleSort('label')}>Label{sortIcon('label')}</th>
               <th>Stone Name</th>
+              <th className="sortable" onClick={() => toggleSort('notes')}>Notes{sortIcon('notes')}</th>
             </tr>
           </thead>
           <tbody>
@@ -50,6 +83,7 @@ export default function AllItems() {
                 <td>{f.name}</td>
                 <td>{f["User Input"] || f.label || '-'}</td>
                 <td>{f["Stone Name"] || '-'}</td>
+                <td className="notes-cell">{f.notes || '-'}</td>
               </tr>
             ))}
           </tbody>

@@ -1,6 +1,12 @@
 {
   "rules": {
     ".read": "auth != null",
-    ".write": false
+    "folders": {
+      "$folderId": {
+        "notes": {
+          ".write": "auth != null"
+        }
+      }
+    }
   }
 }
