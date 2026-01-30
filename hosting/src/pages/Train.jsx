@@ -5,6 +5,10 @@ import * as ort from 'onnxruntime-web'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
 
+// Configure WASM paths to look in the public folder
+ort.env.wasm.wasmPaths = '/'
+ort.env.wasm.numThreads = 1 // Use single thread for stability
+
 export default function Train() {
   const [latestEmbedder, setLatestEmbedder] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -33,8 +37,10 @@ export default function Train() {
       toast.success('Model downloaded', { id: t })
       
       // 2. Load and Infer
-      const t2 = toast.loading('Initializing ONNX session...', { id: t })
-      const session = await ort.InferenceSession.create(arrayBuffer)
+      const t2 = toast.loading('Initializing ONNX session (CPU)...', { id: t })
+      const session = await ort.InferenceSession.create(arrayBuffer, {
+        executionProviders: ['wasm']
+      })
       
       const inputName = session.inputNames[0]
       const inputShape = [1, 3, 224, 224]
