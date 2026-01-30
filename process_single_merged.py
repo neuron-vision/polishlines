@@ -129,8 +129,6 @@ if __name__ == "__main__":
         cv2.imwrite(str(rotated_masked_path), cropped_rotated_image)
 
 
-        cropped_rotated_image_display = cropped_rotated_image.copy()
-        cropped_rotated_image = cropped_rotated_image.astype(np.float32) / 255.0
         float_mask = mask.astype(np.float32) / 255.0
         mean_power = 0
         highpassed_images = []
@@ -171,6 +169,9 @@ if __name__ == "__main__":
 
 
         if PLOT_PNG:
+            cropped_rotated_image_display = cropped_rotated_image.copy()
+            cropped_rotated_image = cropped_rotated_image.astype(np.float32) / 255.0
+
             num_subplot = len(powers)
             num_rows = math.ceil(num_subplot ** 0.5)
             fig, ax = plt.subplots(num_rows, num_rows, figsize=(25, 25))

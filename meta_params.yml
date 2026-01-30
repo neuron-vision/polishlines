@@ -11,3 +11,5 @@ kernels_num_white_num_black: [
 
 resized_height: 100
 should_resize_height: true
+
+fast_test_split_size: 100
