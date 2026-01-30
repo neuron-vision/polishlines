@@ -73,3 +73,10 @@ highpass_results.json
 rules
 plan_results/
 reports/
+
+# Firebase
+functions/venv/
+functions/service_accounts/
+*.pt
+train_log.txt
+cnn_preprocessed/
