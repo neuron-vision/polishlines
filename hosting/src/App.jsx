@@ -6,6 +6,7 @@ import Login from './pages/Login.jsx'
 import AllItems from './pages/AllItems.jsx'
 import DataViewer from './pages/DataViewer.jsx'
 import Train from './pages/Train.jsx'
+import BulkCompile from './pages/BulkCompile.jsx'
 import { Toaster } from 'react-hot-toast'
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="/all_items" element={user ? <AllItems /> : <Navigate to="/login" />} />
         <Route path="/data_viewer/:folderName" element={user ? <DataViewer /> : <Navigate to="/login" />} />
         <Route path="/train" element={user ? <Train /> : <Navigate to="/login" />} />
+        <Route path="/bulk_compile" element={user ? <BulkCompile /> : <Navigate to="/login" />} />
         <Route path="*" element={<Navigate to={user ? "/all_items" : "/login"} />} />
       </Routes>
     </>

@@ -1,3 +1,4 @@
+preprocess_should_resize: [1024, 1024]
 highpass_clip_low_percentile: 2
 highpass_clip_high_percentile: 99
 should_plot_png: true

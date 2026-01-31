@@ -56,6 +56,7 @@ export default function AllItems() {
       <header>
         <h1>All Items</h1>
         <div style={{ display: 'flex', gap: '1rem' }}>
+          <button onClick={() => navigate('/bulk_compile')} style={{ background: '#27ae60' }}>Compile All</button>
           <button onClick={() => navigate('/train')}>Train Page</button>
           <button onClick={() => signOut(auth)}>Logout</button>
         </div>

@@ -11,22 +11,6 @@ from common_utils import ROOT_FOLDER, DATA_FOLDER, PROCESSED_DATA_FOLDER, CNN_PR
 
 meta_params = load_meta_params()
 
-f'''
-For given folder,
-Load all images in the folder
-load Contour.json
-load Extra Data.json
-calculate bbox from contour
-crop the 2 images
-make both grayscale and mean them
-compute mask given the cropped images and the countor which now needs an offest.
-under processed_data/folder_name/ save mask.png, masked_image_[label].png, label.json
-data.json is the Extra Data.json with the label field added and the image_path field with the masked_image_[label].png path
-add the offest contur to the data.json
-
-'''
-
-
 def flatten_dict(d, parent_key='', sep='_'):
     items = []
     for k, v in d.items():
@@ -40,18 +24,14 @@ def flatten_dict(d, parent_key='', sep='_'):
     return dict(items)
 
 if __name__ == "__main__":
-    
     input_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("scan/PLScanDB/1054")
     folder_name = input_path.name
     
-    
     images = []
     for img_path in input_path.glob("*.png"):
-        image = cv2.imread(str(img_path))
-        if image is None:
+        image_gray = cv2.imread(str(img_path), cv2.IMREAD_GRAYSCALE)
+        if image_gray is None:
             continue
-        
-        image_gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         images.append(image_gray)
     
     if not images:
@@ -66,108 +46,81 @@ if __name__ == "__main__":
         label = data.get("Polish Lines Data_User Input", data.get("Polish Lines Data", {}).get("User Input", "Unknown"))
         data['label'] = label
     data = flatten_dict(data)
-    contour_path = input_path / "Contour.json"
     
-    with open(contour_path, 'r') as f:
+    with open(input_path / "Contour.json", 'r') as f:
         contour_data = json.load(f)
-        contour = contour_data["Contour Data"]["Contour"]
+        contour = np.array(contour_data["Contour Data"]["Contour"], dtype=np.int32)
     
-    contour = np.array(contour, dtype=np.int32)
-    x, y, w, h = cv2.boundingRect(contour)
-    cropped = image[y:y+h, x:x+w]
-
-    # Offest the contour by the bounding box
-    offset_contour = contour - np.array([x, y])
-    data['contour'] = offset_contour.tolist()
-    data['contour_offset'] = [x, y]
-
-    data['angles'] = data.get("Polish Lines Data_Chosen Facet PD", data.get("Polish Lines Data", {}).get("Chosen Facet PD", None))
-    data['angles'] = json.loads(data['angles'])
+    data['angles'] = json.loads(data.get("Polish Lines Data_Chosen Facet PD", data.get("Polish Lines Data", {}).get("Chosen Facet PD", "[]")))
     
-    mask = np.zeros(cropped.shape[:2], dtype=np.uint8)
-    cv2.fillPoly(mask, [offset_contour], 255)
-    masked = cv2.bitwise_and(cropped, cropped, mask=mask)
-    
-    output_dir = PROCESSED_DATA_FOLDER / data['label'] / folder_name
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # CNN preprocessing - save 3-channel images per angle
     cnn_folder = CNN_PREPROCESSED_FOLDER / data['label'] / folder_name
-    cnn_data_path = cnn_folder / "data.json"
-    if cnn_data_path.exists():
-        print(f"Skipping {folder_name} - already preprocessed")
-        sys.exit(0)
-
     cnn_output_dir = cnn_folder / "angles"
     cnn_output_dir.mkdir(parents=True, exist_ok=True)
-    cnn_angles = []
     
-    res = meta_params['cnn_min_resolution']
+    cnn_angles = []
+    resize_dim = meta_params.get('preprocess_should_resize')
     
     for idx, angle in enumerate(data['angles']):
-        # Rotate the original image from the center by the angle
         rotation_matrix = cv2.getRotationMatrix2D(original_image_center, angle, 1)
         rotated_image = cv2.warpAffine(image, rotation_matrix, (image.shape[1], image.shape[0]))
         rotated_contour = cv2.transform(np.array([contour]), rotation_matrix)
         x1, y1, w1, h1 = cv2.boundingRect(rotated_contour)
-        cropped_rotated_image = rotated_image[y1:y1+h1, x1:x1+w1]
-        offset_cropped_rotated_contour = rotated_contour - np.array([x1, y1])
         
-        cnn_mask = np.zeros(cropped_rotated_image.shape[:2], dtype=np.uint8)
-        cv2.fillPoly(cnn_mask, [offset_cropped_rotated_contour], 255)
+        cropped_img = rotated_image[y1:y1+h1, x1:x1+w1]
+        offset_contour = rotated_contour - np.array([x1, y1])
+        mask = np.zeros(cropped_img.shape[:2], dtype=np.uint8)
+        cv2.fillPoly(mask, [offset_contour.astype(np.int32)], 255)
         
-        # Resize to high resolution for HRNet
-        h_orig, w_orig = cropped_rotated_image.shape
-        ratio = res / h_orig
-        new_w = int(w_orig * ratio)
-        cropped_rotated_image = cv2.resize(cropped_rotated_image, (new_w, res))
-        cnn_mask = cv2.resize(cnn_mask, (new_w, res), interpolation=cv2.INTER_NEAREST)
+        if resize_dim:
+            cropped_img = cv2.resize(cropped_img, tuple(resize_dim))
+            mask = cv2.resize(mask, tuple(resize_dim), interpolation=cv2.INTER_NEAREST)
         
-        cropped_rotated_image = cv2.bitwise_and(cropped_rotated_image, cropped_rotated_image, mask=cnn_mask)
-        float_mask = cnn_mask.astype(np.float32) / 255.0
-        croped_height, croped_width = cropped_rotated_image.shape
+        img_path = cnn_output_dir / f"angle_{int(angle)}_img.png"
+        mask_path = cnn_output_dir / f"angle_{int(angle)}_mask.png"
+        highpassed_img_path = cnn_output_dir / f"angle_{int(angle)}_highpassed.png"
         
-        # Compute highpass for all kernels and combine
-        all_highpass = []
-        for num_white, num_black in meta_params['kernels_num_white_num_black']:
-            kernel = [1] * num_white + [-1] * num_black + [1] * num_white
-            full_height_kernel = np.repeat([kernel], croped_height, axis=0).reshape(croped_height, -1).astype(np.float32)
-            last_x = croped_width - len(kernel)
-            power = []
-            for i in range(last_x):
-                box = cropped_rotated_image[0:croped_height, i:i+len(kernel)]
-                this_mask = float_mask[0:croped_height, i:i+len(kernel)]
-                pattern = box * full_height_kernel * this_mask
-                this_mask_sum = this_mask.sum() + meta_params['mask_sum_offset']
-                this_power = np.abs(pattern).sum() / this_mask_sum
-                power.append(this_power)
-            power = np.array(power)
-            low_pass = np.convolve(power, np.ones(meta_params['low_pass_filter_length'])/meta_params['low_pass_filter_length'], mode='same')
-            high_pass = power - low_pass
-            high_pass = np.clip(high_pass, np.percentile(high_pass, meta_params['highpass_clip_low_percentile']), np.percentile(high_pass, meta_params['highpass_clip_high_percentile']))
-            high_pass -= high_pass.min()
-            if high_pass.max() > 0:
-                high_pass /= high_pass.max()
-            all_highpass.append(high_pass)
+        # Normalize in float32 using robust percentiles to preserve faint signal
+        img_f = cropped_img.astype(np.float32)
+        if np.any(mask > 0):
+            valid_pixels = img_f[mask > 0]
+            # Use 1st and 99th percentiles for robust scaling to ignore noise spikes
+            p1, p99 = np.percentile(valid_pixels, [1, 99])
+            if p99 > p1:
+                img_f = (img_f - p1) / (p99 - p1 + 1e-6)
+            img_f = np.clip(img_f, 0, 1)
         
-        # Combine highpass from all kernels (mean) - pad to same length first
-        max_len = max(len(hp) for hp in all_highpass)
-        padded_highpass = [np.pad(hp, (0, max_len - len(hp)), mode='constant', constant_values=0) for hp in all_highpass]
-        combined_highpass = np.mean(padded_highpass, axis=0)
-        # Expand 1D highpass to 2D image
-        highpass_2d = np.tile(combined_highpass, (croped_height, 1))
-        highpass_2d = (highpass_2d * 255).astype(np.uint8)
-        # Pad to match image width
-        pad_left = (croped_width - highpass_2d.shape[1]) // 2
-        pad_right = croped_width - highpass_2d.shape[1] - pad_left
-        highpass_2d = np.pad(highpass_2d, ((0, 0), (pad_left, pad_right)), mode='constant', constant_values=0)
+        # Enhanced high-pass: subtract horizontal blur and boost subtle details
+        # Using a wider blur (31 instead of 15) to capture both thin and thick lines
+        blurred_f = cv2.blur(img_f, (31, 1))
+        highpassed_f = np.abs(img_f - blurred_f)
         
-        # Stack 3 channels: greyscale, highpass, mask
-        cnn_image = np.stack([cropped_rotated_image, highpass_2d, cnn_mask], axis=-1)
-        cnn_image_path = cnn_output_dir / f"angle_{int(angle)}.png"
-        cv2.imwrite(str(cnn_image_path), cnn_image)
-        cnn_angles.append(dict(angle=angle, image_path=str(cnn_image_path)))
+        # Apply Gamma correction (power < 1.0) to boost subtle signals in the high-pass
+        # This pulls faint lines out of the noise floor before normalization
+        gamma = 0.5
+        highpassed_f = np.power(highpassed_f, gamma)
+        
+        # Convert back to uint8 for saving
+        masked_img = (img_f * 255).astype(np.uint8)
+        masked_img = cv2.bitwise_and(masked_img, masked_img, mask=mask)
+        
+        # Maximize contrast for the high-pass signal
+        if np.any(mask > 0):
+            highpassed_img = cv2.normalize(highpassed_f, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        else:
+            highpassed_img = np.zeros_like(masked_img)
+        highpassed_img = cv2.bitwise_and(highpassed_img, highpassed_img, mask=mask)
+
+        cv2.imwrite(str(highpassed_img_path), highpassed_img)
+        cv2.imwrite(str(img_path), masked_img)
+        cv2.imwrite(str(mask_path), mask)
+        
+        cnn_angles.append({
+            "angle": angle,
+            "highpassed_image": str(highpassed_img_path),
+            'image': str(img_path),
+            'mask': str(mask_path),
+        })
     
     cnn_data = dict(label=data['label'], angles=cnn_angles)
-    with open(CNN_PREPROCESSED_FOLDER / data['label'] / folder_name / "data.json", 'w') as f:
+    with open(cnn_folder / "data.json", 'w') as f:
         json.dump(cnn_data, f)
