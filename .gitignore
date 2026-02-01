@@ -89,3 +89,4 @@ firebase-debug.*.log
 *.onnx
 *.onnx.data
 *.pkl
+embeddings/

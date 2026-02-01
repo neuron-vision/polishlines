@@ -75,6 +75,12 @@ if __name__ == "__main__":
             cropped_img = cv2.resize(cropped_img, tuple(resize_dim))
             mask = cv2.resize(mask, tuple(resize_dim), interpolation=cv2.INTER_NEAREST)
         
+        # New Erosion Step
+        erosion_size = meta_params.get('mask_erosion_size', 0)
+        if erosion_size > 0:
+            kernel = np.ones((erosion_size, erosion_size), np.uint8)
+            mask = cv2.erode(mask, kernel, iterations=1)
+        
         img_path = cnn_output_dir / f"angle_{int(angle)}_img.png"
         mask_path = cnn_output_dir / f"angle_{int(angle)}_mask.png"
         highpassed_img_path = cnn_output_dir / f"angle_{int(angle)}_highpassed.png"

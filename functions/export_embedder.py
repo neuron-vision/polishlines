@@ -8,7 +8,7 @@ class HorizontalEmbedder(nn.Module):
     def __init__(self):
         super().__init__()
         layers = []
-        in_c = 3 # Rotated image, Highpass, and Mask
+        in_c = 1 # Grayscale Highpass only
         # 10 stages: 1024->512->256->128->64->32->16->8->4->2->1
         # Reduced intermediate channels and kernel size for performance on MPS
         channels = [8, 16, 32, 64, 128, 256, 256, 512, 512, 1024]
@@ -32,10 +32,50 @@ class HorizontalEmbedder(nn.Module):
         x = self.pool(x)
         return x.view(x.size(0), -1)
 
+def train_xgboost():
+    import xgboost as xgb
+    from sklearn.preprocessing import LabelEncoder
+    import pickle
+    from scripts.data_loader import get_dataloader
+
+    model = HorizontalEmbedder()
+    model.eval()
+    device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+    model.to(device)
+
+    if os.path.exists("embeddings_cache.pkl"):
+        print("Loading cached embeddings...")
+        with open("embeddings_cache.pkl", "rb") as f:
+            embeddings, labels = pickle.load(f)
+    else:
+        print("Computing embeddings...")
+        loader = get_dataloader(batch_size=1, shuffle=False, return_labels=True)
+        embeddings = []
+        labels = []
+        with torch.no_grad():
+            for batch, label in loader:
+                batch = batch.to(device)
+                emb = model(batch).cpu().numpy()
+                embeddings.append(emb)
+                labels.extend(label)
+        embeddings = np.vstack(embeddings)
+        with open("embeddings_cache.pkl", "wb") as f:
+            pickle.dump((embeddings, labels), f)
+
+    le = LabelEncoder()
+    y = le.fit_transform(labels)
+    
+    clf = xgb.XGBClassifier()
+    clf.fit(embeddings, y)
+    
+    with open("xgboost_model.pkl", "wb") as f:
+        pickle.dump((clf, le), f)
+    print("XGBoost training complete.")
+
 def export():
     model = HorizontalEmbedder()
     model.eval()
-    dummy_input = torch.randn(1, 3, 1024, 1024)
+    dummy_input = torch.randn(1, 1, 1024, 1024)
     onnx_path = "horizontal_embedder.onnx"
     print(f"Exporting to {onnx_path}...")
     with torch.no_grad():
@@ -53,3 +93,4 @@ def export():
 
 if __name__ == "__main__":
     export()
+    train_xgboost()

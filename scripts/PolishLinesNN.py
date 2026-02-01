@@ -60,18 +60,12 @@ class PolishLinesDataset:
     def get_folder_embeddings(self, folder, embedder, device):
         embeddings = []
         for img_path, hp_path, mask_path in folder['images']:
-            img = Image.open(img_path).convert('L')
             hp = Image.open(hp_path).convert('L')
-            mask = Image.open(mask_path).convert('L')
-            if img.size != (1024, 1024):
-                img = img.resize((1024, 1024), Image.Resampling.LANCZOS)
+            if hp.size != (1024, 1024):
                 hp = hp.resize((1024, 1024), Image.Resampling.LANCZOS)
-                mask = mask.resize((1024, 1024), Image.Resampling.NEAREST)
             
-            img_np = np.array(img).astype(np.float32) / 255.0
             hp_np = np.array(hp).astype(np.float32) / 255.0
-            mask_np = np.array(mask).astype(np.float32) / 255.0
-            data = np.stack([img_np, hp_np, mask_np], axis=0)
+            data = hp_np[np.newaxis, ...]
             tensor = torch.from_numpy(data).unsqueeze(0).to(device)
             
             with torch.no_grad():
